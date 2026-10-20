@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shorty — URL shortener</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-soft: #eef2ff;
+      --error: #dc2626;
+      --success: #059669;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(0,0,0,.04), 0 12px 32px rgba(17,24,39,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b0d12;
+        --card: #151821;
+        --text: #f3f4f6;
+        --muted: #9ca3af;
+        --border: #262b38;
+        --accent: #818cf8;
+        --accent-hover: #a5b4fc;
+        --accent-soft: #1e2140;
+        --error: #f87171;
+        --success: #34d399;
+        --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main { width: 100%; max-width: 560px; }
+
+    header { text-align: center; margin-bottom: 24px; }
+    .logo {
+      display: inline-grid; place-items: center;
+      width: 52px; height: 52px; border-radius: 14px;
+      background: var(--accent); color: #fff; font-size: 26px;
+      margin-bottom: 12px;
+    }
+    h1 { font-size: clamp(1.6rem, 5vw, 2rem); margin: 0; letter-spacing: -0.02em; }
+    .tagline { color: var(--muted); margin: 6px 0 0; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(18px, 4vw, 28px);
+    }
+
+    label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
+    .optional { color: var(--muted); font-weight: 400; }
+
+    input {
+      width: 100%;
+      font: inherit;
+      font-size: 16px; /* prevents iOS zoom-on-focus */
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+    input[aria-invalid="true"] { border-color: var(--error); }
+
+    .alias-row { display: flex; align-items: stretch; margin-top: 14px; }
+    .alias-prefix {
+      display: flex; align-items: center;
+      padding: 0 12px;
+      border: 1px solid var(--border); border-right: 0;
+      border-radius: 10px 0 0 10px;
+      background: var(--accent-soft); color: var(--muted);
+      font-size: .9rem; white-space: nowrap;
+      flex-shrink: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis;
+    }
+    .alias-row input { border-radius: 0 10px 10px 0; min-width: 0; }
+
+    details { margin-top: 14px; }
+    summary { cursor: pointer; color: var(--muted); font-size: .9rem; user-select: none; }
+    summary:hover { color: var(--text); }
+
+    button {
+      font: inherit;
+      font-weight: 600;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .15s, transform .05s, opacity .15s;
+    }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .6; cursor: progress; }
+
+    .primary {
+      width: 100%;
+      margin-top: 18px;
+      padding: 13px 18px;
+      min-height: 48px;
+      background: var(--accent);
+      color: #fff;
+    }
+    @media (prefers-color-scheme: dark) { .primary { color: #0b0d12; } }
+    .primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .error { color: var(--error); font-size: .9rem; margin: 10px 0 0; min-height: 0; }
+    .error:empty { display: none; }
+
+    .result {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      animation: pop .2s ease-out;
+    }
+    .result[hidden] { display: none; }
+    @keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .result-row { display: flex; gap: 10px; align-items: center; }
+    .short-link {
+      flex: 1; min-width: 0;
+      font-weight: 700; font-size: 1.05rem;
+      color: var(--accent);
+      text-decoration: none;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .short-link:hover { text-decoration: underline; }
+    .copy {
+      flex-shrink: 0;
+      min-height: 40px;
+      padding: 8px 16px;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .copy:hover { border-color: var(--accent); }
+    .copy.copied { color: var(--success); border-color: var(--success); }
+    .original {
+      margin: 8px 0 0;
+      font-size: .85rem; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .history { margin-top: 24px; }
+    .history[hidden] { display: none; }
+    .history-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .history h2 { font-size: .9rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; }
+    .link-btn { background: none; color: var(--muted); padding: 4px; font-weight: 500; font-size: .85rem; }
+    .link-btn:hover { color: var(--text); }
+    .history ul { list-style: none; margin: 0; padding: 0; }
+    .history li {
+      display: flex; gap: 12px; align-items: center;
+      padding: 10px 2px;
+      border-top: 1px solid var(--border);
+    }
+    .history li:first-child { border-top: 0; }
+    .history .meta { flex: 1; min-width: 0; }
+    .history a { color: var(--text); font-weight: 600; text-decoration: none; }
+    .history a:hover { color: var(--accent); }
+    .history .from { display: block; font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history .copy { min-height: 34px; padding: 6px 12px; font-size: .85rem; }
+
+    footer { margin-top: 28px; color: var(--muted); font-size: .8rem; text-align: center; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    @media (max-width: 420px) {
+      .result-row { flex-direction: column; align-items: stretch; }
+      .copy { width: 100%; min-height: 44px; }
+      .history .copy { width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="logo" aria-hidden="true">🔗</div>
+      <h1>Shorty</h1>
+      <p class="tagline">Paste a long URL, get a short link.</p>
+    </header>
+
+    <section class="card">
+      <form id="form" novalidate>
+        <label for="url">Long URL</label>
+        <input id="url" name="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="https://example.com/a/very/long/path?with=params" required autofocus>
+
+        <details id="alias-details">
+          <summary>Custom alias <span class="optional">(optional)</span></summary>
+          <div class="alias-row">
+            <span class="alias-prefix" id="alias-prefix"></span>
+            <label for="code" class="sr-only">Custom alias</label>
+            <input id="code" name="code" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+                   placeholder="my-link" maxlength="32" pattern="[A-Za-z0-9_-]{3,32}">
+          </div>
+        </details>
+
+        <button class="primary" id="submit" type="submit">Shorten</button>
+        <p class="error" id="error" role="alert"></p>
+      </form>
+
+      <div class="result" id="result" hidden aria-live="polite">
+        <div class="result-row">
+          <a class="short-link" id="short-link" href="#" target="_blank" rel="noopener"></a>
+          <button class="copy" id="copy" type="button">Copy</button>
+        </div>
+        <p class="original" id="original"></p>
+      </div>
+    </section>
+
+    <section class="history" id="history" hidden>
+      <div class="history-head">
+        <h2>Recent</h2>
+        <button class="link-btn" id="clear-history" type="button">Clear</button>
+      </div>
+      <div class="card"><ul id="history-list"></ul></div>
+    </section>
+
+    <footer>No accounts. Links are stored on this server. Recent list is kept only in this browser.</footer>
+  </main>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const form = $('form'), urlInput = $('url'), codeInput = $('code');
+      const submit = $('submit'), errorEl = $('error');
+      const result = $('result'), shortLink = $('short-link'), original = $('original'), copyBtn = $('copy');
+      const historyEl = $('history'), historyList = $('history-list');
+      const HISTORY_KEY = 'shorty.history';
+      const HISTORY_MAX = 5;
+
+      $('alias-prefix').textContent = location.host + '/';
+
+      function setError(msg, field) {
+        errorEl.textContent = msg || '';
+        urlInput.removeAttribute('aria-invalid');
+        codeInput.removeAttribute('aria-invalid');
+        if (field) field.setAttribute('aria-invalid', 'true');
+      }
+
+      async function copy(text, btn) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = Object.assign(document.createElement('textarea'), { value: text });
+          ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); ta.remove();
+        }
+        const label = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = label; btn.classList.remove('copied'); }, 1500);
+      }
+
+      function loadHistory() {
+        try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+      }
+      function saveHistory(items) {
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items)); } catch {}
+      }
+      function renderHistory() {
+        const items = loadHistory();
+        historyList.replaceChildren();
+        historyEl.hidden = items.length === 0;
+        for (const item of items) {
+          const li = document.createElement('li');
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          const a = Object.assign(document.createElement('a'), {
+            href: item.shortUrl, target: '_blank', rel: 'noopener',
+            textContent: item.shortUrl.replace(/^https?:\/\//, ''),
+          });
+          const from = Object.assign(document.createElement('span'), { className: 'from', textContent: item.url, title: item.url });
+          meta.append(a, from);
+          const btn = Object.assign(document.createElement('button'), { className: 'copy', type: 'button', textContent: 'Copy' });
+          btn.addEventListener('click', () => copy(item.shortUrl, btn));
+          li.append(meta, btn);
+          historyList.append(li);
+        }
+      }
+      function addToHistory(entry) {
+        const items = loadHistory().filter((i) => i.shortUrl !== entry.shortUrl);
+        items.unshift(entry);
+        saveHistory(items.slice(0, HISTORY_MAX));
+        renderHistory();
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setError('');
+        const url = urlInput.value.trim();
+        const code = codeInput.value.trim();
+        if (!url) { setError('Please paste a URL first.', urlInput); urlInput.focus(); return; }
+        if (code && !/^[A-Za-z0-9_-]{3,32}$/.test(code)) {
+          setError('Custom alias must be 3–32 letters, numbers, - or _.', codeInput); codeInput.focus(); return;
+        }
+
+        submit.disabled = true;
+        submit.textContent = 'Shortening…';
+        try {
+          const res = await fetch('/api/shorten', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(code ? { url, code } : { url }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setError(data.error || 'Something went wrong. Please try again.', res.status === 409 ? codeInput : urlInput);
+            result.hidden = true;
+            return;
+          }
+          shortLink.href = data.shortUrl;
+          shortLink.textContent = data.shortUrl.replace(/^https?:\/\//, '');
+          original.textContent = data.url;
+          original.title = data.url;
+          result.hidden = false;
+          addToHistory({ shortUrl: data.shortUrl, url: data.url });
+          form.reset();
+          $('alias-details').open = false;
+        } catch {
+          setError('Network error. Is the server running?');
+        } finally {
+          submit.disabled = false;
+          submit.textContent = 'Shorten';
+        }
+      });
+
+      copyBtn.addEventListener('click', () => copy(shortLink.href, copyBtn));
+      $('clear-history').addEventListener('click', () => { saveHistory([]); renderHistory(); });
+      urlInput.addEventListener('input', () => setError(''));
+      codeInput.addEventListener('input', () => setError(''));
+
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>
