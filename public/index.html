@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Shorten a link</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --card: #ffffff;
+      --field: #ffffff;
+      --text: #16181d;
+      --muted: #5f6672;
+      --border: #d5d9e0;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --error: #c62828;
+      --result-bg: #eef4ff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #181b21;
+        --field: #0f1115;
+        --text: #e8eaee;
+        --muted: #9aa2ae;
+        --border: #2f343e;
+        --accent: #4f8cff;
+        --accent-hover: #6a9dff;
+        --error: #ff6b6b;
+        --result-bg: #1a2436;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    main { width: 100%; max-width: 560px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 20px;
+      box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
+    }
+    @media (min-width: 600px) {
+      .card { padding: 40px; }
+    }
+
+    h1 { margin: 0 0 4px; font-size: 1.6rem; letter-spacing: -.01em; }
+    .subtitle { margin: 0 0 28px; color: var(--muted); }
+
+    .field { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .95rem; }
+    .optional { font-weight: 400; color: var(--muted); }
+
+    input {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 14px;
+      font: inherit;
+      font-size: 16px; /* prevents iOS zoom on focus */
+      color: inherit;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    input[aria-invalid="true"] { border-color: var(--error); }
+
+    .alias-group {
+      display: flex;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .alias-group:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+    .alias-group:has(input[aria-invalid="true"]) { border-color: var(--error); }
+    .alias-prefix {
+      align-self: center;
+      max-width: 55%;
+      padding-left: 14px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .alias-group input { flex: 1 1 0; width: auto; min-width: 80px; border: 0; padding-left: 1px; background: transparent; }
+    .alias-group input:focus { outline: none; }
+
+    .hint, .error { margin: 6px 0 0; font-size: .875rem; }
+    .hint { color: var(--muted); }
+    .error { color: var(--error); }
+
+    button, .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 10px 20px;
+      font: inherit;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .primary { width: 100%; color: #fff; background: var(--accent); }
+    .primary:hover { background: var(--accent-hover); }
+    .primary:disabled { opacity: .6; cursor: progress; }
+    .secondary { flex: 1; color: var(--text); background: var(--card); border-color: var(--border); }
+    .secondary:hover { border-color: var(--accent); }
+
+    .result {
+      margin-top: 24px;
+      padding: 16px;
+      background: var(--result-bg);
+      border-radius: 12px;
+    }
+    .result-label { margin: 0 0 4px; font-size: .875rem; color: var(--muted); }
+    .short-link {
+      display: block;
+      margin-bottom: 14px;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-all;
+    }
+    .actions { display: flex; gap: 10px; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <h1>Shorten a link</h1>
+      <p class="subtitle">Paste a long URL and get a short one back.</p>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="url">Long URL</label>
+          <input id="url" name="url" type="text" inputmode="url" autocomplete="off" autocapitalize="none"
+                 spellcheck="false" placeholder="https://example.com/a/very/long/link" aria-describedby="url-error" required>
+          <p id="url-error" class="error" hidden></p>
+        </div>
+
+        <div class="field">
+          <label for="alias">Custom alias <span class="optional">(optional)</span></label>
+          <div class="alias-group">
+            <span class="alias-prefix" id="alias-prefix"></span>
+            <input id="alias" name="alias" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+                   maxlength="32" placeholder="my-link" aria-describedby="alias-hint alias-error">
+          </div>
+          <p id="alias-hint" class="hint">Leave empty for a random code. 3–32 letters, numbers, - or _.</p>
+          <p id="alias-error" class="error" hidden></p>
+        </div>
+
+        <button id="submit" class="primary" type="submit">Shorten</button>
+      </form>
+
+      <div id="result" class="result" aria-live="polite" hidden>
+        <p id="result-label" class="result-label">Your short link</p>
+        <a id="short-link" class="short-link" target="_blank" rel="noopener"></a>
+        <div class="actions">
+          <button id="copy" class="secondary" type="button">Copy</button>
+          <a id="open" class="button secondary" target="_blank" rel="noopener">Open</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,32}$/;
+    const $ = id => document.getElementById(id);
+    const form = $('form'), urlInput = $('url'), aliasInput = $('alias'), submit = $('submit');
+    const result = $('result'), shortLink = $('short-link'), openLink = $('open'), copyBtn = $('copy');
+
+    $('alias-prefix').textContent = location.host + '/';
+
+    function setError(input, message) {
+      const el = $(input.id + '-error');
+      el.textContent = message;
+      el.hidden = !message;
+      input.setAttribute('aria-invalid', message ? 'true' : 'false');
+    }
+
+    function aliasProblem(alias) {
+      return alias && !ALIAS_PATTERN.test(alias) ? 'Use 3–32 letters, numbers, - or _ (no spaces).' : '';
+    }
+
+    urlInput.addEventListener('input', () => setError(urlInput, ''));
+    aliasInput.addEventListener('input', () => setError(aliasInput, aliasProblem(aliasInput.value.trim())));
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      let url = urlInput.value.trim();
+      const alias = aliasInput.value.trim();
+
+      if (!url) return setError(urlInput, 'Paste a URL to shorten.'), urlInput.focus();
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url; // allow "example.com"
+      if (aliasProblem(alias)) return setError(aliasInput, aliasProblem(alias)), aliasInput.focus();
+
+      submit.disabled = true;
+      submit.textContent = 'Shortening…';
+      try {
+        const response = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, alias: alias || null }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          const input = data.field === 'alias' ? aliasInput : urlInput;
+          setError(input, data.error || 'Something went wrong.');
+          input.focus();
+          return;
+        }
+        showResult(data);
+        aliasInput.value = '';
+      } catch {
+        setError(urlInput, "Couldn't reach the server. Please try again.");
+      } finally {
+        submit.disabled = false;
+        submit.textContent = 'Shorten';
+      }
+    });
+
+    function showResult({ shortUrl, existing }) {
+      $('result-label').textContent = existing ? 'This URL was already shortened' : 'Your short link';
+      shortLink.textContent = shortUrl;
+      shortLink.href = openLink.href = shortUrl;
+      copyBtn.textContent = 'Copy';
+      result.hidden = false;
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      const text = shortLink.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Clipboard API needs a secure context (e.g. not available over plain-HTTP LAN IPs)
+        const area = Object.assign(document.createElement('textarea'), { value: text });
+        document.body.append(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+      }
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
+    });
+  </script>
+</body>
+</html>
